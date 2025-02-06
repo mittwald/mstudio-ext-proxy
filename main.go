@@ -14,19 +14,23 @@ import (
 
 func main() {
 	mongoClient := bootstrap.ConnectToMongodb(os.Getenv("MONGODB_URI"))
+	mongoDatabase := mongoClient.Database("mstudio_ext")
 	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromEnv()
-	webhookVerifier := bootstrap.BuildWebhookVerifier(mittwaldClient)
-
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoClient.Database("mstudio_ext").Collection("instances"))
+	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
+	sessionRepository := persistence.NewMongoSessionRepository(mongoDatabase.Collection("sessions"))
 
 	webhookCtrl := controller.WebhookController{
 		ExtensionInstanceRepository: instanceRepository,
-		WebhookVerifier:             webhookVerifier,
+		WebhookVerifier:             bootstrap.BuildWebhookVerifier(mittwaldClient),
 		Logger:                      logger,
 	}
-	authCtrl := controller.UserAuthenticationController{}
+	authCtrl := controller.UserAuthenticationController{
+		Client:            mittwaldClient,
+		SessionRepository: sessionRepository,
+		Development:       true,
+	}
 
 	r := gin.New()
 	rm := r.Group("/mstudio")
