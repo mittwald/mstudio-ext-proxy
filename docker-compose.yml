@@ -1,0 +1,15 @@
+services:
+  devserver:
+    image: mittwald/marketplace-local-dev-server:latest
+    volumes:
+      - .env:/.env
+    ports:
+      - 8080:8080
+  mongodb:
+    image: mongo:8
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
