@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/persistence"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/proxy"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +22,12 @@ func main() {
 	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromEnv()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
+	authOptions := authentication.Options{
+		CookieName: "mstudio_ext_session",
+		CookieTTL:  60 * time.Minute,
+		JWTSecret:  []byte(os.Getenv("MITTWALD_EXT_PROXY_SECRET")),
+	}
+
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
 	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
 
@@ -28,19 +37,37 @@ func main() {
 		Logger:                      logger,
 	}
 	authCtrl := controller.UserAuthenticationController{
-		Client:            mittwaldClient,
-		SessionRepository: sessionRepository,
-		Development:       true,
-		TTL:               60 * time.Minute,
+		Client:                mittwaldClient,
+		SessionRepository:     sessionRepository,
+		Development:           os.Getenv("MITTWALD_EXT_PROXY_CONTEXT") == "dev",
+		AuthenticationOptions: authOptions,
 	}
 
 	r := gin.New()
 	rm := r.Group("/mstudio")
 	rm.POST("/webhooks", webhookCtrl.HandleWebhookRequest)
-	rm.GET("/auth", authCtrl.HandleAuthenticationRequest)
+	rm.GET("/auth/oneclick", authCtrl.HandleAuthenticationRequest)
+	rm.GET("/auth/fake", authCtrl.HandleFakeAuthentication)
 
 	mux := http.NewServeMux()
 	mux.Handle("/mstudio/", r)
+
+	proxyConfigs := make(proxy.ConfigurationCollection)
+	if err := json.Unmarshal([]byte(os.Getenv("MITTWALD_EXT_PROXY_UPSTREAMS")), &proxyConfigs); err != nil {
+		panic(err)
+	}
+
+	for prefix, proxyConfig := range proxyConfigs {
+		proxyHandler := proxy.Handler{
+			HTTPClient:            http.DefaultClient,
+			SessionRepository:     sessionRepository,
+			Configuration:         proxyConfig,
+			Logger:                logger,
+			AuthenticationOptions: authOptions,
+		}
+
+		mux.Handle(prefix, &proxyHandler)
+	}
 
 	s := http.Server{
 		Handler: mux,

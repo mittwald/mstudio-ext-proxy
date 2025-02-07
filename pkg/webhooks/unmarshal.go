@@ -29,11 +29,11 @@ func UnmarshalWebhookRequestV1(envelope *webhookscommon.Envelope, body []byte) (
 	switch envelope.Kind {
 	case "ExtensionAddedToContext":
 		target = &webhooksv1.ExtensionAddedToContext{}
-	case "ExtensionInstanceUpdated":
+	case "ExtensionInstanceUpdated", "InstanceUpdated":
 		target = &webhooksv1.ExtensionInstanceUpdated{}
-	case "ExtensionInstanceSecretRotated":
+	case "ExtensionInstanceSecretRotated", "SecretRotated":
 		target = &webhooksv1.ExtensionInstanceSecretRotated{}
-	case "ExtensionInstanceRemovedFromContext":
+	case "ExtensionInstanceRemovedFromContext", "InstanceRemovedFromContext":
 		target = &webhooksv1.ExtensionInstanceRemovedFromContext{}
 	default:
 		return nil, fmt.Errorf("unknown webhook kind %s", envelope.Kind)

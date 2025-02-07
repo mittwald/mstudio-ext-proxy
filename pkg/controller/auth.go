@@ -3,10 +3,10 @@ package controller
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/mittwald/api-client-go/mittwaldv2"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
 	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
 	"net/http"
@@ -14,64 +14,97 @@ import (
 )
 
 type UserAuthenticationController struct {
-	Client            generatedv2.Client
-	SessionRepository repository.SessionRepository
-	Development       bool
-	TTL               time.Duration
+	Client                generatedv2.Client
+	SessionRepository     repository.SessionRepository
+	Development           bool
+	AuthenticationOptions authentication.Options
 }
 
 func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Context) {
 	atrek, ok := ctx.GetQuery("atrek")
 	if !ok {
-		ctx.JSON(http.StatusBadRequest, errorResponse{Message: "missing 'atrek' query parameter"})
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'atrek' query parameter"})
 		return
 	}
 
 	userID, ok := ctx.GetQuery("userID")
 	if !ok {
-		ctx.JSON(http.StatusBadRequest, errorResponse{Message: "missing 'userID' query parameter"})
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'userID' query parameter"})
 		return
 	}
 
 	token, err := c.getAPITokenFromATREK(ctx, atrek, userID)
 	if err != nil {
-		ctx.JSON(http.StatusForbidden, errorResponseFromErr("error getting access token", err))
+		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
 		return
 	}
 
 	authClient, err := mittwaldv2.New(ctx, mittwaldv2.WithAccessToken(token))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponseFromErr("error authenticating at API", err))
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error authenticating at API", err))
 		return
 	}
 
 	req := userclientv2.GetUserRequest{UserID: userID}
 	resp, _, err := authClient.User().GetUser(ctx, req)
 	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
-	session := model.Session{
-		ID:          uuid.Must(uuid.NewUUID()).String(),
-		Expires:     time.Now().Add(c.TTL),
-		Email:       strPtrOr(resp.Email, ""),
-		UserID:      resp.UserId,
-		FirstName:   resp.Person.FirstName,
-		LastName:    resp.Person.LastName,
-		AccessToken: token,
+	session, err := model.NewSession()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+		return
 	}
 
+	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
+	session.Email = strPtrOr(resp.Email, "")
+	session.UserID = resp.UserId
+	session.FirstName = resp.Person.FirstName
+	session.LastName = resp.Person.LastName
+	session.AccessToken = token
+
 	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponseFromErr("error initializing session", err))
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
 	if c.Development {
-		ctx.SetCookie("mstudio_ext_session", session.CookieString(), 3600, "/", "", false, false)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
 	} else {
-		ctx.SetCookie("mstudio_ext_session", session.CookieString(), 3600, "/", "", true, true)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", true, true)
 	}
 
+	ctx.Redirect(http.StatusSeeOther, "/")
+}
+
+// CAUTION: DO NOT USE IN PRODUCTION
+func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context) {
+	if !c.Development {
+		ctx.JSON(http.StatusForbidden, ErrorResponse{Message: "not available"})
+		return
+	}
+
+	session, err := model.NewSession()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+		return
+	}
+
+	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
+	session.Email = "user@mstudio.example"
+	session.UserID = "522963df-3ebf-4158-80cc-1e9a78aca9b5"
+	session.FirstName = "Max"
+	session.LastName = "Mustermann"
+	session.AccessToken = "fake-api-token"
+
+	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+		return
+	}
+
+	ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
 	ctx.Redirect(http.StatusSeeOther, "/")
 }
 

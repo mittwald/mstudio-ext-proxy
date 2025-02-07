@@ -1,4 +1,17 @@
 services:
+  proxy:
+    build: .
+    profiles:
+      - with_proxy
+    environment:
+      MITTWALD_BASE_URL: http://localhost:8080/v2
+      MITTWALD_EXT_PROXY_UPSTREAMS: '{"/":{"upstreamURL":"http://httpbin.org"}}'
+      MITTWALD_EXT_PROXY_CONTEXT: dev
+      MITTWALD_EXT_PROXY_SECRET: secret
+      MONGODB_URI: mongodb://admin:secret@mongodb:27017
+      PORT: 8000
+    ports:
+      - 8000:8000
   devserver:
     image: mittwald/marketplace-local-dev-server:latest
     volumes:

@@ -1,10 +1,10 @@
 package controller
 
-type errorResponse struct {
+type ErrorResponse struct {
 	Message string `json:"message"`
-	Details string `json:"details"`
+	Details string `json:"details,omitempty"`
 }
 
-func errorResponseFromErr(msg string, err error) *errorResponse {
-	return &errorResponse{msg, err.Error()}
+func ErrorResponseFromErr(msg string, err error) *ErrorResponse {
+	return &ErrorResponse{msg, err.Error()}
 }

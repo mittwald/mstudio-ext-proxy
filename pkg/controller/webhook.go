@@ -22,20 +22,20 @@ type WebhookController struct {
 func (c *WebhookController) HandleWebhookRequest(ctx *gin.Context) {
 	payload, err := io.ReadAll(ctx.Request.Body)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponseFromErr("error reading payload", err))
+		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error reading payload", err))
 		return
 	}
 
 	if err := c.WebhookVerifier.VerifyWebhookRequest(ctx, ctx.Request, payload); err != nil {
 		c.Logger.Debug("invalid webhook signature", "err", err)
-		ctx.JSON(http.StatusForbidden, errorResponseFromErr("invalid request signature", err))
+		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("invalid request signature", err))
 		return
 	}
 
 	wh, env, err := webhooks.UnmarshalWebhookRequest(payload)
 	if err != nil {
 		c.Logger.Debug("invalid webhook request", "err", err)
-		ctx.JSON(http.StatusBadRequest, errorResponseFromErr("could not decode webhook request", err))
+		ctx.JSON(http.StatusBadRequest, ErrorResponseFromErr("could not decode webhook request", err))
 		return
 	}
 
@@ -54,7 +54,7 @@ func (c *WebhookController) HandleWebhookRequest(ctx *gin.Context) {
 
 	if err != nil {
 		c.Logger.Debug("invalid webhook request", "err", err)
-		ctx.JSON(http.StatusBadRequest, errorResponseFromErr("could not decode webhook request", err))
+		ctx.JSON(http.StatusBadRequest, ErrorResponseFromErr("could not decode webhook request", err))
 		return
 	}
 
