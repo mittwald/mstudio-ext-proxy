@@ -6,6 +6,7 @@ import (
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -15,10 +16,33 @@ type mongoSessionRepository struct {
 	collection *mongo.Collection
 }
 
-func NewMongoSessionRepository(collection *mongo.Collection) repository.SessionRepository {
-	return &mongoSessionRepository{
+func MustNewMongoSessionRepository(collection *mongo.Collection) repository.SessionRepository {
+	repo, err := NewMongoSessionRepository(collection)
+	if err != nil {
+		panic(err)
+	}
+
+	return repo
+}
+
+func NewMongoSessionRepository(collection *mongo.Collection) (repository.SessionRepository, error) {
+	repo := &mongoSessionRepository{
 		collection: collection,
 	}
+
+	if err := repo.Setup(context.Background()); err != nil {
+		return nil, err
+	}
+
+	return repo, nil
+}
+
+func (m *mongoSessionRepository) Setup(ctx context.Context) error {
+	_, err := m.collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{"expires", 1}},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	})
+	return err
 }
 
 func (m *mongoSessionRepository) FindSessionByIDAndSecret(ctx context.Context, id string, secret []byte) (*model.Session, error) {

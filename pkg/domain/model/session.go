@@ -1,9 +1,13 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Session struct {
 	ID            string `bson:"_id"`
+	Expires       time.Time
 	SessionSecret []byte
 	UserID        string
 	FirstName     string

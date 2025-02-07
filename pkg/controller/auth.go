@@ -10,12 +10,14 @@ import (
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
 	"net/http"
+	"time"
 )
 
 type UserAuthenticationController struct {
 	Client            generatedv2.Client
 	SessionRepository repository.SessionRepository
 	Development       bool
+	TTL               time.Duration
 }
 
 func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Context) {
@@ -51,6 +53,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 
 	session := model.Session{
 		ID:          uuid.Must(uuid.NewUUID()).String(),
+		Expires:     time.Now().Add(c.TTL),
 		Email:       strPtrOr(resp.Email, ""),
 		UserID:      resp.UserId,
 		FirstName:   resp.Person.FirstName,

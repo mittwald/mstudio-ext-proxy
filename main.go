@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
-	sessionRepository := persistence.NewMongoSessionRepository(mongoDatabase.Collection("sessions"))
+	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
 
 	webhookCtrl := controller.WebhookController{
 		ExtensionInstanceRepository: instanceRepository,
@@ -30,6 +31,7 @@ func main() {
 		Client:            mittwaldClient,
 		SessionRepository: sessionRepository,
 		Development:       true,
+		TTL:               60 * time.Minute,
 	}
 
 	r := gin.New()
