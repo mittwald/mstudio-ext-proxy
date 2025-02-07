@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/persistence"
@@ -13,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 )
 
 func main() {
@@ -21,13 +19,7 @@ func main() {
 	mongoDatabase := mongoClient.Database("mstudio_ext")
 	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromEnv()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-
-	authOptions := authentication.Options{
-		CookieName:     "mstudio_ext_session",
-		CookieTTL:      60 * time.Minute,
-		JWTSecret:      []byte(os.Getenv("MITTWALD_EXT_PROXY_SECRET")),
-		StaticPassword: os.Getenv("MITTWALD_EXT_PROXY_STATIC_PASSWORD"),
-	}
+	authOptions := bootstrap.BuildAuthenticationOptions()
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
 	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
