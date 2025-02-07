@@ -23,9 +23,10 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	authOptions := authentication.Options{
-		CookieName: "mstudio_ext_session",
-		CookieTTL:  60 * time.Minute,
-		JWTSecret:  []byte(os.Getenv("MITTWALD_EXT_PROXY_SECRET")),
+		CookieName:     "mstudio_ext_session",
+		CookieTTL:      60 * time.Minute,
+		JWTSecret:      []byte(os.Getenv("MITTWALD_EXT_PROXY_SECRET")),
+		StaticPassword: os.Getenv("MITTWALD_EXT_PROXY_STATIC_PASSWORD"),
 	}
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
@@ -39,15 +40,22 @@ func main() {
 	authCtrl := controller.UserAuthenticationController{
 		Client:                mittwaldClient,
 		SessionRepository:     sessionRepository,
+		InstanceRepository:    instanceRepository,
 		Development:           os.Getenv("MITTWALD_EXT_PROXY_CONTEXT") == "dev",
 		AuthenticationOptions: authOptions,
 	}
 
 	r := gin.New()
+	r.LoadHTMLGlob("templates/*")
+
 	rm := r.Group("/mstudio")
 	rm.POST("/webhooks", webhookCtrl.HandleWebhookRequest)
 	rm.GET("/auth/oneclick", authCtrl.HandleAuthenticationRequest)
 	rm.GET("/auth/fake", authCtrl.HandleFakeAuthentication)
+
+	if authOptions.StaticPassword != "" {
+		rm.Any("/auth/password", authCtrl.HandlePasswordAuthentication)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/mstudio/", r)

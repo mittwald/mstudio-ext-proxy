@@ -16,8 +16,13 @@ import (
 type UserAuthenticationController struct {
 	Client                generatedv2.Client
 	SessionRepository     repository.SessionRepository
+	InstanceRepository    repository.ExtensionInstanceRepository
 	Development           bool
 	AuthenticationOptions authentication.Options
+}
+
+type PasswordFormInput struct {
+	Password string `form:"password"`
 }
 
 func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Context) {
@@ -33,9 +38,21 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 		return
 	}
 
+	instanceID, ok := ctx.GetQuery("instanceID")
+	if !ok {
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'instanceID' query parameter"})
+		return
+	}
+
 	token, err := c.getAPITokenFromATREK(ctx, atrek, userID)
 	if err != nil {
 		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
+		return
+	}
+
+	instance, err := c.InstanceRepository.FindExtensionInstanceByID(ctx, instanceID)
+	if !ok {
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance"})
 		return
 	}
 
@@ -64,6 +81,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	session.FirstName = resp.Person.FirstName
 	session.LastName = resp.Person.LastName
 	session.AccessToken = token
+	session.Instance = instance
 
 	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
@@ -79,6 +97,37 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	ctx.Redirect(http.StatusSeeOther, "/")
 }
 
+func (c *UserAuthenticationController) HandlePasswordAuthentication(ctx *gin.Context) {
+	if ctx.Request.Method == http.MethodPost {
+		input := PasswordFormInput{}
+		if err := ctx.Bind(&input); err != nil {
+			ctx.String(http.StatusBadRequest, "missing 'password' parameter")
+			return
+		}
+
+		if input.Password == c.AuthenticationOptions.StaticPassword {
+			session, err := c.buildFakeSession()
+			if err != nil {
+				ctx.String(http.StatusInternalServerError, "error initializing session")
+				return
+			}
+
+			if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
+				ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+				return
+			}
+
+			ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
+			ctx.Redirect(http.StatusSeeOther, "/")
+			return
+		}
+	}
+
+	ctx.HTML(http.StatusOK, "login.html", gin.H{
+		"LoginRoute": "/mstudio/auth/password",
+	})
+}
+
 // CAUTION: DO NOT USE IN PRODUCTION
 func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context) {
 	if !c.Development {
@@ -86,18 +135,11 @@ func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context
 		return
 	}
 
-	session, err := model.NewSession()
+	session, err := c.buildFakeSession()
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
-
-	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
-	session.Email = "user@mstudio.example"
-	session.UserID = "522963df-3ebf-4158-80cc-1e9a78aca9b5"
-	session.FirstName = "Max"
-	session.LastName = "Mustermann"
-	session.AccessToken = "fake-api-token"
 
 	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
@@ -122,6 +164,22 @@ func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context,
 	}
 
 	return resp.Token, nil
+}
+
+func (c *UserAuthenticationController) buildFakeSession() (model.Session, error) {
+	session, err := model.NewSession()
+	if err != nil {
+		return session, err
+	}
+
+	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
+	session.Email = "user@mstudio.example"
+	session.UserID = "522963df-3ebf-4158-80cc-1e9a78aca9b5"
+	session.FirstName = "Max"
+	session.LastName = "Mustermann"
+	session.AccessToken = "fake-api-token"
+
+	return session, nil
 }
 
 func strPtrOr(one *string, alt string) string {

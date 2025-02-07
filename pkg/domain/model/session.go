@@ -3,6 +3,7 @@ package model
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ type Session struct {
 	LastName      string
 	Email         string
 	AccessToken   string
+	Instance      ExtensionInstance
 }
 
 func NewSession() (Session, error) {
@@ -69,6 +71,22 @@ func SessionIDAndSecretFromCookieString(cookieString string) (string, []byte) {
 	}
 
 	return parts[0], secret
+}
+
+func (s *SessionClaims) MarshalJSON() ([]byte, error) {
+	out := map[string]any{
+		"exp":   s.Session.Expires.Unix(),
+		"iat":   s.IssuedAt.Unix(),
+		"nbf":   s.IssuedAt.Unix(),
+		"iss":   "mstudio-ext-proxy",
+		"sub":   s.Session.UserID,
+		"fname": s.Session.FirstName,
+		"lname": s.Session.LastName,
+		"email": s.Session.Email,
+		"ctx":   s.Session.Instance.Context,
+	}
+
+	return json.Marshal(out)
 }
 
 func (s SessionClaims) GetExpirationTime() (*jwt.NumericDate, error) {

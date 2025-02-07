@@ -18,6 +18,7 @@ ENV PORT=8000
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /mstudio-ext-proxy /mstudio-ext-proxy
+COPY templates /templates
 
 # Set entrypoint
 ENTRYPOINT ["/mstudio-ext-proxy"]
