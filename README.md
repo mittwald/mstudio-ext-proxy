@@ -66,6 +66,28 @@ Example:
 }
 ```
 
+### mStudio marketplace configuration
+
+When registering an extension to the mStudio marketplace using this component, your configuration YAML should look like this:
+
+```yaml
+...
+externalComponents:
+  backend:
+    extensionAddedToContext:
+      url: https://extension.example/mstudio/webhooks
+    extensionInstanceUpdated:
+      url: https://extension.example/mstudio/webhooks
+    extensionInstanceSecretRotated:
+      url: https://extension.example/mstudio/webhooks
+    extensionInstanceRemovedFromContext:
+      url: https://extension.example/mstudio/webhooks
+  frontends:
+    index:
+      url: https://extension.example/mstudio/auth/oneclick?atrek=:accessTokenRetrievalKey&userId=:userId&instanceID=:extensionInstanceId
+
+```
+
 ## Accessing user data in upstream applications
 
 Upstream applications will receive an additional HTTP header `X-Mstudio-User` with an JWT that contains the relevant user information in its claims:
