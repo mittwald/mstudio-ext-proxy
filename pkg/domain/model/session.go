@@ -84,6 +84,7 @@ func (s *SessionClaims) MarshalJSON() ([]byte, error) {
 		"lname": s.Session.LastName,
 		"email": s.Session.Email,
 		"inst":  s.Session.Instance.Context,
+		"tok":   s.Session.AccessToken,
 	}
 
 	return json.Marshal(out)
