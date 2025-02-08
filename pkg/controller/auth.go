@@ -51,7 +51,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	}
 
 	instance, err := c.InstanceRepository.FindExtensionInstanceByID(ctx, instanceID)
-	if !ok {
+	if err != nil {
 		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance"})
 		return
 	}
