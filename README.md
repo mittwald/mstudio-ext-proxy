@@ -13,6 +13,7 @@ Features:
 Pending:
 
 - [ ] Support for mittwald mStudio oAuth authentication
+- [ ] Support for other database backends than MongoDB (for better integration into mittwald managed services)
 
 ## Running
 
