@@ -39,7 +39,7 @@ func NewMongoSessionRepository(collection *mongo.Collection) (repository.Session
 
 func (m *mongoSessionRepository) Setup(ctx context.Context) error {
 	_, err := m.collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{"expires", 1}},
+		Keys:    bson.D{{Key: "expires", Value: 1}},
 		Options: options.Index().SetExpireAfterSeconds(0),
 	})
 	return err
