@@ -1,5 +1,8 @@
 # mittwald mStudio authentication proxy
 
+> [!NOTE]
+> This is a very incomplete proof-of-concept implementation; usage in production environments is not recommended, yet. Use at own risk.
+
 This repository contains a small HTTP reverse proxy which can be used to quickly add mStudio authentication to an existing web application.
 
 Features:
@@ -62,3 +65,15 @@ Example:
   }
 }
 ```
+
+## Accessing user data in upstream applications
+
+Upstream applications will receive an additional HTTP header `X-Mstudio-User` with an JWT that contains the relevant user information in its claims:
+
+- `sub`: mStudio user ID
+- `fname` and `lname`: First and last name
+- `email`: email address
+- `inst`: information about the extension instance; the subfields `id` identify the extension instance, and `context.id` and `context.kind` the mstudio resource (meaning the organization or project), in which the extension was installed
+- `tok`: an mStudio access token, which can be used to access the mStudio API as the accessing user
+
+The JWT is signed with the secret that needs to be specified in `MITTWALD_EXT_PROXY_SECRET`. Your upstream applications need access to this secret in order to verify the JWT for authenticity.
