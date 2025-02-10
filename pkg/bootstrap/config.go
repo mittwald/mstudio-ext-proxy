@@ -6,12 +6,13 @@ import (
 )
 
 type Config struct {
-	MongoDBURI      string `envconfig:"mongodb_uri"`
-	Secret          string `required:"true"`
-	StaticPassword  string `envconfig:"static_password"`
-	MittwaldBaseURL string `envconfig:"api_base_url"`
-	Context         string
-	Upstreams       proxy.ConfigurationCollection
+	MongoDBURI                string `envconfig:"mongodb_uri"`
+	Secret                    string `required:"true"`
+	StaticPassword            string `envconfig:"static_password"`
+	MittwaldBaseURL           string `envconfig:"api_base_url"`
+	Context                   string
+	Upstreams                 proxy.ConfigurationCollection
+	RedirectOnUnauthenticated string `envconfig:"redirect_on_unauthenticated"`
 }
 
 func ConfigFromEnv() *Config {

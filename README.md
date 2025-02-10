@@ -48,6 +48,7 @@ The following environment variables can be used to modify this proxy's behaviour
 - `MITTWALD_EXT_PROXY_STATIC_PASSWORD` defines a static password that can be used to bypass the mStudio authentication by navigating to the `/mstudio/auth/password` endpoint. If this variable is omitted, that endpoint will not be available.
 - `MITTWALD_EXT_PROXY_CONTEXT` can be used to enable development mode (by setting it to `dev`). In development, secure cookies are not enforced, and the `/mstudio/auth/fake` endpoint is available.
 - `MITTWALD_EXT_PROXY_UPSTREAMS` contains a JSON object with the proxy configuration. See section below for examples.
+- `MITTWALD_EXT_PROXY_REDIRECT_ON_UNAUTHENTICATED` is used when no password or OAuth authentication is enabled; in this case, the user will be redirected to this URL when accessing the extension without authentication.
 
 ### Proxy configuration
 

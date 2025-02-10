@@ -15,11 +15,12 @@ import (
 )
 
 type Handler struct {
-	Configuration         Configuration
-	SessionRepository     repository.SessionRepository
-	AuthenticationOptions authentication.Options
-	Logger                *slog.Logger
-	HTTPClient            *http.Client
+	Configuration             Configuration
+	SessionRepository         repository.SessionRepository
+	AuthenticationOptions     authentication.Options
+	Logger                    *slog.Logger
+	HTTPClient                *http.Client
+	RedirectOnUnauthenticated string
 }
 
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -85,6 +86,18 @@ func (h *Handler) responseError(writer http.ResponseWriter, code int, msg string
 }
 
 func (h *Handler) respondUnauthorized(writer http.ResponseWriter) {
+	if h.AuthenticationOptions.StaticPassword != "" {
+		writer.Header().Set("Location", "/mstudio/auth/password")
+		writer.WriteHeader(http.StatusSeeOther)
+		return
+	}
+
+	if h.RedirectOnUnauthenticated != "" {
+		writer.Header().Set("Location", h.RedirectOnUnauthenticated)
+		writer.WriteHeader(http.StatusSeeOther)
+		return
+	}
+
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(writer).Encode(controller.ErrorResponse{Message: "unauthorized"})
