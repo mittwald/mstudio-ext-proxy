@@ -178,6 +178,12 @@ func (c *UserAuthenticationController) buildFakeSession() (model.Session, error)
 	session.FirstName = "Max"
 	session.LastName = "Mustermann"
 	session.AccessToken = "fake-api-token"
+	session.Instance.ID = "848821a6-7bbb-4b15-a267-7b67e14e5a27"
+	session.Instance.Enabled = true
+	session.Instance.Context.Kind = "customer"
+	session.Instance.Context.ID = "4a30329f-3bb7-4871-b9e2-e4815718e74a"
+	session.Instance.Scopes = []string{}
+	session.Instance.Secret = []byte("very secret")
 
 	return session, nil
 }
