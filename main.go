@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
@@ -54,6 +55,10 @@ func main() {
 	mux.Handle("/mstudio/", r)
 
 	for prefix, proxyConfig := range config.Upstreams {
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+
 		proxyHandler := proxy.Handler{
 			HTTPClient:            http.DefaultClient,
 			SessionRepository:     sessionRepository,
