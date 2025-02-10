@@ -21,7 +21,7 @@ Pending:
 
 ```
 $ docker run -p 8000:8000 \
-    -e MONGODB_URI=mongodb://... \
+    -e MITTWALD_EXT_PROXY_MONGODB_URI=mongodb://... \
     -e MITTWALD_EXT_PROXY_SECRET=... \
     -e MITTWALD_EXT_PROXY_STATIC_PASSWORD=supersecret \
     -e MITTWALD_EXT_PROXY_UPSTREAMS='{"/":{"upstreamURL":"http://..."}}' \
@@ -43,7 +43,7 @@ Write me
 The following environment variables can be used to modify this proxy's behaviour:
 
 - `PORT` is the port that the HTTP proxy should listen on. If omitted, this will default to `8000`.
-- `MONGODB_URI` is the URI for a MongoDB connection. Used to store active extension instances and sessions.
+- `MITTWALD_EXT_PROXY_MONGODB_URI` is the URI for a MongoDB connection. Used to store active extension instances and sessions.
 - `MITTWALD_EXT_PROXY_SECRET` is the secret used for signing JWTs that are passed to the upstream application. **If omitted, this service will not start**.
 - `MITTWALD_EXT_PROXY_STATIC_PASSWORD` defines a static password that can be used to bypass the mStudio authentication by navigating to the `/mstudio/auth/password` endpoint. If this variable is omitted, that endpoint will not be available.
 - `MITTWALD_EXT_PROXY_CONTEXT` can be used to enable development mode (by setting it to `dev`). In development, secure cookies are not enforced, and the `/mstudio/auth/fake` endpoint is available.

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
@@ -15,11 +14,13 @@ import (
 )
 
 func main() {
-	mongoClient := bootstrap.ConnectToMongodb(os.Getenv("MONGODB_URI"))
+	config := bootstrap.ConfigFromEnv()
+
+	mongoClient := bootstrap.ConnectToMongodb(config.MongoDBURI)
 	mongoDatabase := mongoClient.Database("mstudio_ext")
-	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromEnv()
+	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromConfig(config)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	authOptions := bootstrap.BuildAuthenticationOptions()
+	authOptions := bootstrap.BuildAuthenticationOptions(config)
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
 	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
@@ -33,7 +34,7 @@ func main() {
 		Client:                mittwaldClient,
 		SessionRepository:     sessionRepository,
 		InstanceRepository:    instanceRepository,
-		Development:           os.Getenv("MITTWALD_EXT_PROXY_CONTEXT") == "dev",
+		Development:           config.Context == "dev",
 		AuthenticationOptions: authOptions,
 	}
 
@@ -52,12 +53,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/mstudio/", r)
 
-	proxyConfigs := make(proxy.ConfigurationCollection)
-	if err := json.Unmarshal([]byte(os.Getenv("MITTWALD_EXT_PROXY_UPSTREAMS")), &proxyConfigs); err != nil {
-		panic(err)
-	}
-
-	for prefix, proxyConfig := range proxyConfigs {
+	for prefix, proxyConfig := range config.Upstreams {
 		proxyHandler := proxy.Handler{
 			HTTPClient:            http.DefaultClient,
 			SessionRepository:     sessionRepository,

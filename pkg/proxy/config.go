@@ -28,3 +28,11 @@ type Configuration struct {
 }
 
 type ConfigurationCollection map[string]Configuration
+
+func (cc *ConfigurationCollection) Decode(value string) error {
+	if err := json.Unmarshal([]byte(value), &cc); err != nil {
+		return err
+	}
+
+	return nil
+}
