@@ -59,6 +59,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 
 	proxyRequest, _ := http.NewRequest(request.Method, proxyRequestURL.String(), request.Body)
 	proxyRequest.Header.Set("X-Mstudio-User", tokenStr)
+	copyHeaders(request.Header, proxyRequest.Header)
 
 	proxyResponse, err := h.HTTPClient.Do(proxyRequest)
 	if err != nil {
@@ -66,11 +67,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	for header, values := range proxyResponse.Header {
-		for _, value := range values {
-			writer.Header().Add(header, value)
-		}
-	}
+	copyHeaders(proxyResponse.Header, writer.Header())
 
 	writer.WriteHeader(proxyResponse.StatusCode)
 
@@ -101,4 +98,12 @@ func (h *Handler) respondUnauthorized(writer http.ResponseWriter) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(writer).Encode(controller.ErrorResponse{Message: "unauthorized"})
+}
+
+func copyHeaders(source, target http.Header) {
+	for header, values := range source {
+		for _, value := range values {
+			target.Add(header, value)
+		}
+	}
 }
