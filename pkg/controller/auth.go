@@ -2,6 +2,11 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/mittwald/api-client-go/mittwaldv2"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
@@ -9,8 +14,6 @@ import (
 	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
-	"net/http"
-	"time"
 )
 
 type UserAuthenticationController struct {
@@ -26,21 +29,9 @@ type PasswordFormInput struct {
 }
 
 func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Context) {
-	atrek, ok := ctx.GetQuery("atrek")
-	if !ok {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'atrek' query parameter"})
-		return
-	}
-
-	userID, ok := ctx.GetQuery("userID")
-	if !ok {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'userID' query parameter"})
-		return
-	}
-
-	instanceID, ok := ctx.GetQuery("instanceID")
-	if !ok {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "missing 'instanceID' query parameter"})
+	userID, instanceID, atrek, err := extractAuthenticationParamsFromRequest(ctx.Request)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance", Details: err.Error()})
 		return
 	}
 
@@ -186,6 +177,29 @@ func (c *UserAuthenticationController) buildFakeSession() (model.Session, error)
 	session.Instance.Secret = []byte("very secret")
 
 	return session, nil
+}
+
+// extractAuthenticationParamsFromRequest is a helper function to extract all
+// necessary authentication options from a request. This is done by directly
+// iterating over the query params in order to allow case-insensitive params
+// (to avoid common confusions like "userId" vs "userID")
+func extractAuthenticationParamsFromRequest(req *http.Request) (userID, instanceID, atrek string, err error) {
+	for key, values := range req.URL.Query() {
+		switch strings.ToLower(key) {
+		case "userid":
+			userID = values[0]
+		case "instanceid":
+			instanceID = values[0]
+		case "atrek":
+			atrek = values[0]
+		}
+	}
+
+	if userID == "" || instanceID == "" || atrek == "" {
+		err = fmt.Errorf("all the userId, instanceId and atrek query params must be set")
+	}
+
+	return
 }
 
 func strPtrOr(one *string, alt string) string {

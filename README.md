@@ -86,7 +86,7 @@ externalComponents:
       url: https://extension.example/mstudio/webhooks
   frontends:
     index:
-      url: https://extension.example/mstudio/auth/oneclick?atrek=:accessTokenRetrievalKey&userId=:userId&instanceID=:extensionInstanceId
+      url: https://extension.example/mstudio/auth/oneclick?atrek=:accessTokenRetrievalKey&userId=:userId&instanceId=:extensionInstanceId
 
 ```
 
