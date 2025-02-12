@@ -16,11 +16,11 @@ import (
 
 func main() {
 	config := bootstrap.ConfigFromEnv()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	mongoClient := bootstrap.ConnectToMongodb(config.MongoDBURI)
 	mongoDatabase := mongoClient.Database("mstudio_ext")
-	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromConfig(config)
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mittwaldClient := bootstrap.BuildMittwaldAPIClientFromConfig(config, logger)
 	authOptions := bootstrap.BuildAuthenticationOptions(config)
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))

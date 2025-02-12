@@ -13,6 +13,7 @@ type Config struct {
 	Context                   string
 	Upstreams                 proxy.ConfigurationCollection
 	RedirectOnUnauthenticated string `envconfig:"redirect_on_unauthenticated"`
+	LogHttpBodies             bool   `envconfig:"log_http_bodies"`
 }
 
 func ConfigFromEnv() *Config {
