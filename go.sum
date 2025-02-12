@@ -56,6 +56,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mittwald/api-client-go v0.2.3 h1:0K5U4n31cmM6mRuGgmzscgoqZBeUBeDtHwdCV6NJJLo=
 github.com/mittwald/api-client-go v0.2.3/go.mod h1:/jyrwP4sRaf36MYgJ1cc07hB2RSf60zdTvb4m4Kn5Kw=
+github.com/mittwald/api-client-go v0.2.6 h1:VqAJCinX2mVqrQYTWPZtcDHyGhUqXG4EsBmoD9zaaiE=
+github.com/mittwald/api-client-go v0.2.6/go.mod h1:/jyrwP4sRaf36MYgJ1cc07hB2RSf60zdTvb4m4Kn5Kw=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
