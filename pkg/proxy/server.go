@@ -22,7 +22,6 @@ type Handler struct {
 	Logger                    *slog.Logger
 	HTTPClient                *http.Client
 	RedirectOnUnauthenticated string
-	ProxyBufferSize           int64
 }
 
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
