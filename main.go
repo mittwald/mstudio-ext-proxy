@@ -65,7 +65,6 @@ func main() {
 			Configuration:         proxyConfig,
 			Logger:                logger,
 			AuthenticationOptions: authOptions,
-			ProxyBufferSize:       config.ProxyBufferSize,
 		}
 
 		mux.Handle(prefix, &proxyHandler)
