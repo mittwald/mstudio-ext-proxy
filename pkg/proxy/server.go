@@ -106,15 +106,7 @@ func (h *Handler) copyProxyResponse(writer http.ResponseWriter, proxyResponse *h
 }
 
 func (h *Handler) copyProxyResponseBody(proxyResponse io.Reader, writer io.Writer) error {
-	if h.ProxyBufferSize != 0 {
-		buf := make([]byte, h.ProxyBufferSize)
-		if _, err := io.CopyBuffer(writer, proxyResponse, buf); err != nil {
-			return err
-		}
-	}
-
-	_, err := io.Copy(writer, proxyResponse)
-	return err
+	return h.copyBodyWithFlush(proxyResponse, writer)
 }
 
 func (h *Handler) responseError(writer http.ResponseWriter, code int, msg string, err error) {
@@ -145,6 +137,36 @@ func copyHeaders(source, target http.Header) {
 	for header, values := range source {
 		for _, value := range values {
 			target.Add(header, value)
+		}
+	}
+}
+
+func (h *Handler) copyBodyWithFlush(source io.Reader, target io.Writer) error {
+	flusher, ok := target.(http.Flusher)
+	if !ok {
+		h.Logger.Warn("response writer does not support flushing")
+
+		_, err := io.Copy(target, source)
+		return err
+	}
+
+	buf := make([]byte, 32*1024)
+
+	for {
+		n, err := source.Read(buf)
+		isEOF := errors.Is(err, io.EOF)
+		if err != nil && !isEOF {
+			return err
+		}
+
+		if _, err := target.Write(buf[:n]); err != nil {
+			return err
+		}
+
+		flusher.Flush()
+
+		if isEOF {
+			return nil
 		}
 	}
 }
