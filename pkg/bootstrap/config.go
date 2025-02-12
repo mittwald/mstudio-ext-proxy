@@ -14,6 +14,7 @@ type Config struct {
 	Upstreams                 proxy.ConfigurationCollection
 	RedirectOnUnauthenticated string `envconfig:"redirect_on_unauthenticated"`
 	LogHttpBodies             bool   `envconfig:"log_http_bodies"`
+	ProxyBufferSize           int64  `envconfig:"buffer_size"`
 }
 
 func ConfigFromEnv() *Config {

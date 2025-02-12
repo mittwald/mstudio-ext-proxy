@@ -3,15 +3,16 @@ package proxy
 import (
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
+	"net/http"
+	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
-	"io"
-	"log/slog"
-	"net/http"
-	"strings"
 )
 
 type Handler struct {
@@ -21,13 +22,13 @@ type Handler struct {
 	Logger                    *slog.Logger
 	HTTPClient                *http.Client
 	RedirectOnUnauthenticated string
+	ProxyBufferSize           int64
 }
 
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	authCookie, err := request.Cookie(h.AuthenticationOptions.CookieName)
 	if err != nil {
 		if errors.Is(err, http.ErrNoCookie) {
-			// TODO
 			h.respondUnauthorized(writer)
 			return
 		}
@@ -41,13 +42,45 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, session.IssueClaims())
-	tokenStr, err := token.SignedString(h.AuthenticationOptions.JWTSecret)
+	token, err := h.buildUserJWT(session)
 	if err != nil {
 		h.responseError(writer, http.StatusInternalServerError, "internal server error", err)
 		return
 	}
 
+	proxyRequest := h.buildProxyRequest(request, token)
+	proxyResponse, err := h.HTTPClient.Do(proxyRequest)
+	if err != nil {
+		h.responseError(writer, http.StatusBadGateway, "bad gateway", err)
+		return
+	}
+
+	h.copyProxyResponse(writer, proxyResponse)
+}
+
+func (h *Handler) buildUserJWT(session *model.Session) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, session.IssueClaims())
+	tokenStr, err := token.SignedString(h.AuthenticationOptions.JWTSecret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenStr, nil
+}
+
+func (h *Handler) buildProxyRequest(request *http.Request, tokenStr string) *http.Request {
+	proxyRequestURL := h.buildProxyRequestURL(request)
+
+	l := h.Logger.With("req.url", request.URL.String(), "upstream.url", proxyRequestURL)
+	l.Debug("proxying request")
+
+	proxyRequest, _ := http.NewRequest(request.Method, proxyRequestURL, request.Body)
+	proxyRequest.Header.Set("X-Mstudio-User", tokenStr)
+	copyHeaders(request.Header, proxyRequest.Header)
+	return proxyRequest
+}
+
+func (h *Handler) buildProxyRequestURL(request *http.Request) string {
 	proxyRequestURL := *request.URL
 	proxyRequestURL.Host = h.Configuration.UpstreamURL.Host
 	proxyRequestURL.Scheme = h.Configuration.UpstreamURL.Scheme
@@ -57,29 +90,31 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		proxyRequestURL.Path = strings.TrimPrefix(proxyRequestURL.Path, h.Configuration.StripPrefix)
 	}
 
-	l := h.Logger.With("req.url", request.URL.String(), "upstream.url", proxyRequestURL.String())
-	l.Debug("proxying request")
+	return proxyRequestURL.String()
+}
 
-	proxyRequest, _ := http.NewRequest(request.Method, proxyRequestURL.String(), request.Body)
-	proxyRequest.Header.Set("X-Mstudio-User", tokenStr)
-	copyHeaders(request.Header, proxyRequest.Header)
-
-	proxyResponse, err := h.HTTPClient.Do(proxyRequest)
-	if err != nil {
-		h.responseError(writer, http.StatusBadGateway, "bad gateway", err)
-		return
-	}
-
-	l = l.With("res.status", proxyResponse.StatusCode)
+func (h *Handler) copyProxyResponse(writer http.ResponseWriter, proxyResponse *http.Response) {
+	l := h.Logger.With("res.status", proxyResponse.StatusCode)
 	l.Debug("proxy response")
 
 	copyHeaders(proxyResponse.Header, writer.Header())
 
 	writer.WriteHeader(proxyResponse.StatusCode)
-
-	if _, err := io.Copy(writer, proxyResponse.Body); err != nil {
-		return
+	if err := h.copyProxyResponseBody(proxyResponse.Body, writer); err != nil {
+		h.Logger.Warn("error while copying proxy response", "err", err)
 	}
+}
+
+func (h *Handler) copyProxyResponseBody(proxyResponse io.Reader, writer io.Writer) error {
+	if h.ProxyBufferSize != 0 {
+		buf := make([]byte, h.ProxyBufferSize)
+		if _, err := io.CopyBuffer(writer, proxyResponse, buf); err != nil {
+			return err
+		}
+	}
+
+	_, err := io.Copy(writer, proxyResponse)
+	return err
 }
 
 func (h *Handler) responseError(writer http.ResponseWriter, code int, msg string, err error) {
