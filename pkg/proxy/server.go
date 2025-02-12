@@ -57,6 +57,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		proxyRequestURL.Path = strings.TrimPrefix(proxyRequestURL.Path, h.Configuration.StripPrefix)
 	}
 
+	l := h.Logger.With("req.url", request.URL.String(), "upstream.url", proxyRequestURL.String())
+	l.Debug("proxying request")
+
 	proxyRequest, _ := http.NewRequest(request.Method, proxyRequestURL.String(), request.Body)
 	proxyRequest.Header.Set("X-Mstudio-User", tokenStr)
 	copyHeaders(request.Header, proxyRequest.Header)
@@ -66,6 +69,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.responseError(writer, http.StatusBadGateway, "bad gateway", err)
 		return
 	}
+
+	l = l.With("res.status", proxyResponse.StatusCode)
+	l.Debug("proxy response")
 
 	copyHeaders(proxyResponse.Header, writer.Header())
 
