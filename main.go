@@ -37,6 +37,7 @@ func main() {
 		InstanceRepository:    instanceRepository,
 		Development:           config.Context == "dev",
 		AuthenticationOptions: authOptions,
+		Logger:                logger,
 	}
 
 	r := gin.New()
