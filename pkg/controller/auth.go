@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type UserAuthenticationController struct {
 	InstanceRepository    repository.ExtensionInstanceRepository
 	Development           bool
 	AuthenticationOptions authentication.Options
+	Logger                *slog.Logger
 }
 
 type PasswordFormInput struct {
@@ -29,26 +31,34 @@ type PasswordFormInput struct {
 }
 
 func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Context) {
+	l := c.Logger
+
 	userID, instanceID, atrek, err := extractAuthenticationParamsFromRequest(ctx.Request)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance", Details: err.Error()})
+		l.Error("failed to extract authentication parameters", "error", err)
+		ctx.JSON(http.StatusBadRequest, ErrorResponseFromErr("could not retrieve instance", err))
 		return
 	}
 
+	l = l.With("userID", userID, "instanceID", instanceID)
+
 	token, err := c.getAPITokenFromATREK(ctx, atrek, userID)
 	if err != nil {
+		l.Error("failed to get access token", "error", err)
 		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
 		return
 	}
 
 	instance, err := c.InstanceRepository.FindExtensionInstanceByID(ctx, instanceID)
 	if err != nil {
+		l.Error("failed to get instance", "error", err)
 		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance"})
 		return
 	}
 
 	authClient, err := mittwaldv2.New(ctx, mittwaldv2.WithAccessToken(token))
 	if err != nil {
+		l.Error("failed to authenticate at API", "error", err)
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error authenticating at API", err))
 		return
 	}
@@ -56,12 +66,14 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	req := userclientv2.GetUserRequest{UserID: userID}
 	resp, _, err := authClient.User().GetUser(ctx, req)
 	if err != nil {
+		l.Error("failed to get user", "error", err)
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
 	session, err := model.NewSession()
 	if err != nil {
+		l.Error("failed to initialize session", "error", err)
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
@@ -75,6 +87,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	session.Instance = instance
 
 	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
+		l.Error("failed to create session", "error", err)
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
