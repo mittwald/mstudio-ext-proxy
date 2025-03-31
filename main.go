@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/persistence"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/proxy"
 	"log/slog"
@@ -25,6 +26,8 @@ func main() {
 
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
 	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
+
+	sessionService := service.NewSessionService(mittwaldClient, sessionRepository)
 
 	webhookCtrl := controller.WebhookController{
 		ExtensionInstanceRepository: instanceRepository,
@@ -63,6 +66,7 @@ func main() {
 		proxyHandler := proxy.Handler{
 			HTTPClient:            http.DefaultClient,
 			SessionRepository:     sessionRepository,
+			SessionService:        sessionService,
 			Configuration:         proxyConfig,
 			Logger:                logger,
 			AuthenticationOptions: authOptions,

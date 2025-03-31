@@ -42,7 +42,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 
 	l = l.With("userID", userID, "instanceID", instanceID)
 
-	token, err := c.getAPITokenFromATREK(ctx, atrek, userID)
+	token, refresh, exp, err := c.getAPITokenFromATREK(ctx, atrek, userID)
 	if err != nil {
 		l.Error("failed to get access token", "error", err)
 		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
@@ -78,13 +78,16 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 		return
 	}
 
-	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
+	session.Expires = exp
 	session.Email = strPtrOr(resp.Email, "")
 	session.UserID = resp.UserId
 	session.FirstName = resp.Person.FirstName
 	session.LastName = resp.Person.LastName
 	session.AccessToken = token
+	session.RefreshToken = refresh
 	session.Instance = instance
+
+	cookieAge := int(exp.Sub(time.Now()).Seconds())
 
 	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
 		l.Error("failed to create session", "error", err)
@@ -93,9 +96,9 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	}
 
 	if c.Development {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), cookieAge*3, "/", "", false, false)
 	} else {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", true, true)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), cookieAge*3, "/", "", true, true)
 	}
 
 	ctx.Redirect(http.StatusSeeOther, "/")
@@ -154,7 +157,7 @@ func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context
 	ctx.Redirect(http.StatusSeeOther, "/")
 }
 
-func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context, atrek, userID string) (string, error) {
+func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context, atrek, userID string) (string, string, time.Time, error) {
 	req := userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequest{
 		Body: userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequestBody{
 			AccessTokenRetrievalKey: atrek,
@@ -164,10 +167,10 @@ func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context,
 
 	resp, _, err := c.Client.User().AuthenticateWithAccessTokenRetrievalKey(ctx, req)
 	if err != nil {
-		return "", err
+		return "", "", time.Time{}, err
 	}
 
-	return resp.Token, nil
+	return resp.Token, resp.RefreshToken, resp.ExpiresAt, nil
 }
 
 func (c *UserAuthenticationController) buildFakeSession() (model.Session, error) {

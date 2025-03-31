@@ -9,4 +9,5 @@ type SessionRepository interface {
 	FindSessionByIDAndSecret(ctx context.Context, id string, secret []byte) (*model.Session, error)
 	CreateSession(ctx context.Context, session model.Session) error
 	CreateSessionWithUnhashedSecret(ctx context.Context, session model.Session) error
+	RefreshSession(ctx context.Context, session model.Session) error
 }
