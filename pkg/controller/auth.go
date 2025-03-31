@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
-	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
@@ -110,22 +108,6 @@ func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context
 
 	ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
 	ctx.Redirect(http.StatusSeeOther, "/")
-}
-
-func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context, atrek, userID string) (string, string, time.Time, error) {
-	req := userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequest{
-		Body: userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequestBody{
-			AccessTokenRetrievalKey: atrek,
-			UserId:                  userID,
-		},
-	}
-
-	resp, _, err := c.Client.User().AuthenticateWithAccessTokenRetrievalKey(ctx, req)
-	if err != nil {
-		return "", "", time.Time{}, err
-	}
-
-	return resp.Token, resp.RefreshToken, resp.ExpiresAt, nil
 }
 
 func (c *UserAuthenticationController) buildFakeSession() (model.Session, error) {
