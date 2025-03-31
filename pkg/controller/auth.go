@@ -9,17 +9,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mittwald/api-client-go/mittwaldv2"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
 	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
 )
 
 type UserAuthenticationController struct {
 	Client                generatedv2.Client
 	SessionRepository     repository.SessionRepository
+	SessionService        service.SessionService
 	InstanceRepository    repository.ExtensionInstanceRepository
 	Development           bool
 	AuthenticationOptions authentication.Options
@@ -42,63 +43,17 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 
 	l = l.With("userID", userID, "instanceID", instanceID)
 
-	token, refresh, exp, err := c.getAPITokenFromATREK(ctx, atrek, userID)
+	session, err := c.SessionService.InitializeSessionFromRetrievalKey(ctx, atrek, userID, instanceID)
 	if err != nil {
-		l.Error("failed to get access token", "error", err)
-		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
-		return
-	}
-
-	instance, err := c.InstanceRepository.FindExtensionInstanceByID(ctx, instanceID)
-	if err != nil {
-		l.Error("failed to get instance", "error", err)
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance"})
-		return
-	}
-
-	authClient, err := mittwaldv2.New(ctx, mittwaldv2.WithAccessToken(token))
-	if err != nil {
-		l.Error("failed to authenticate at API", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error authenticating at API", err))
-		return
-	}
-
-	req := userclientv2.GetUserRequest{UserID: userID}
-	resp, _, err := authClient.User().GetUser(ctx, req)
-	if err != nil {
-		l.Error("failed to get user", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
-		return
-	}
-
-	session, err := model.NewSession()
-	if err != nil {
-		l.Error("failed to initialize session", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
-		return
-	}
-
-	session.Expires = exp
-	session.Email = strPtrOr(resp.Email, "")
-	session.UserID = resp.UserId
-	session.FirstName = resp.Person.FirstName
-	session.LastName = resp.Person.LastName
-	session.AccessToken = token
-	session.RefreshToken = refresh
-	session.Instance = instance
-
-	cookieAge := int(exp.Sub(time.Now()).Seconds())
-
-	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
 		l.Error("failed to create session", "error", err)
 		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
 	if c.Development {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), cookieAge*3, "/", "", false, false)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 0, "/", "", false, false)
 	} else {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), cookieAge*3, "/", "", true, true)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 0, "/", "", true, true)
 	}
 
 	ctx.Redirect(http.StatusSeeOther, "/")
@@ -216,11 +171,4 @@ func extractAuthenticationParamsFromRequest(req *http.Request) (userID, instance
 	}
 
 	return
-}
-
-func strPtrOr(one *string, alt string) string {
-	if one != nil {
-		return *one
-	}
-	return alt
 }
