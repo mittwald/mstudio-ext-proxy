@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/mittwald/api-client-go/mittwaldv2"
 	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 )
 
 func (s *sessionService) InitializeSessionFromRetrievalKey(ctx context.Context, atrek, userID, instanceID string) (*model.Session, error) {
@@ -18,7 +20,7 @@ func (s *sessionService) InitializeSessionFromRetrievalKey(ctx context.Context, 
 
 	instance, err := s.instanceRepository.FindExtensionInstanceByID(ctx, instanceID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting instance %s: %w", instanceID, err)
+		return nil, httperr.ErrWithStatus(http.StatusNotFound, "instance not found", fmt.Errorf("error getting instance %s: %w", instanceID, err))
 	}
 
 	authClient, err := mittwaldv2.New(ctx, mittwaldv2.WithAccessToken(token))
@@ -63,7 +65,7 @@ func (s *sessionService) getAPITokenFromATREK(ctx context.Context, atrek, userID
 
 	resp, _, err := s.client.User().AuthenticateWithAccessTokenRetrievalKey(ctx, req)
 	if err != nil {
-		return "", "", time.Time{}, err
+		return "", "", time.Time{}, httperr.ErrWithStatus(http.StatusUnauthorized, "invalid retrieval key", err)
 	}
 
 	return resp.Token, resp.RefreshToken, resp.ExpiresAt, nil

@@ -13,6 +13,7 @@ import (
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 )
 
 type UserAuthenticationController struct {
@@ -44,7 +45,7 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 	session, err := c.SessionService.InitializeSessionFromRetrievalKey(ctx, atrek, userID, instanceID)
 	if err != nil {
 		l.Error("failed to create session", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+		ctx.JSON(httperr.StatusForError(err), ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
