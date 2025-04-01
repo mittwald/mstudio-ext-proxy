@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -109,6 +110,30 @@ func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context
 
 	ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
 	ctx.Redirect(http.StatusSeeOther, "/")
+}
+
+func (c *UserAuthenticationController) HandleUserInfo(ctx *gin.Context) {
+	authCookie, err := ctx.Cookie(c.AuthenticationOptions.CookieName)
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			ctx.JSON(http.StatusUnauthorized, ErrorResponse{Message: "no session"})
+			return
+		}
+	}
+
+	sessionID, sessionSecret := model.SessionIDAndSecretFromCookieString(authCookie)
+	session, err := c.SessionService.RetrieveSession(ctx, sessionID, sessionSecret)
+	if err != nil {
+		ctx.JSON(httperr.StatusForError(err), ErrorResponse{Message: "no session"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, UserInfoDTO{
+		ID:        session.UserID,
+		FirstName: session.FirstName,
+		LastName:  session.LastName,
+		Email:     session.Email,
+	})
 }
 
 func (c *UserAuthenticationController) buildFakeSession() (model.Session, error) {
