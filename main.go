@@ -52,6 +52,7 @@ func main() {
 	rm.POST("/webhooks", webhookCtrl.HandleWebhookRequest)
 	rm.GET("/auth/oneclick", authCtrl.HandleAuthenticationRequest)
 	rm.GET("/auth/fake", authCtrl.HandleFakeAuthentication)
+	rm.GET("/auth/current", authCtrl.HandleUserInfo)
 
 	if authOptions.StaticPassword != "" {
 		rm.Any("/auth/password", authCtrl.HandlePasswordAuthentication)

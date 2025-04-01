@@ -3,7 +3,6 @@ package proxy
 import (
 	"encoding/json"
 	"errors"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 )
 
 type Handler struct {
@@ -36,22 +37,10 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	sessionID, sessionSecret := model.SessionIDAndSecretFromCookieString(authCookie.Value)
-	session, err := h.SessionRepository.FindSessionByIDAndSecret(request.Context(), sessionID, sessionSecret)
+	session, err := h.SessionService.RetrieveSession(request.Context(), sessionID, sessionSecret)
 	if err != nil {
-		h.Logger.Warn("invalid session", "err", err)
-		h.respondUnauthorized(writer)
+		h.responseError(writer, httperr.StatusForError(err), "error retrieving session", err)
 		return
-	}
-
-	if session.IsExpired() {
-		refreshedSession, err := h.SessionService.RefreshSession(request.Context(), session)
-		if err != nil {
-			h.Logger.Warn("error while refreshing session", "err", err)
-			h.responseError(writer, http.StatusInternalServerError, "internal server error", err)
-			return
-		}
-
-		session = refreshedSession
 	}
 
 	token, err := h.buildUserJWT(session)

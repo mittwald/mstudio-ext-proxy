@@ -9,6 +9,7 @@ import (
 
 type SessionService interface {
 	InitializeSessionFromRetrievalKey(ctx context.Context, atrek, userID, instanceID string) (*model.Session, error)
+	RetrieveSession(ctx context.Context, sessionID string, sessionSecret []byte) (*model.Session, error)
 	RefreshSession(ctx context.Context, session *model.Session) (*model.Session, error)
 }
 
