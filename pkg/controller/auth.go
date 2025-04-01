@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,17 +8,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mittwald/api-client-go/mittwaldv2"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
-	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/authentication"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/repository"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 )
 
 type UserAuthenticationController struct {
 	Client                generatedv2.Client
 	SessionRepository     repository.SessionRepository
+	SessionService        service.SessionService
 	InstanceRepository    repository.ExtensionInstanceRepository
 	Development           bool
 	AuthenticationOptions authentication.Options
@@ -42,60 +42,17 @@ func (c *UserAuthenticationController) HandleAuthenticationRequest(ctx *gin.Cont
 
 	l = l.With("userID", userID, "instanceID", instanceID)
 
-	token, err := c.getAPITokenFromATREK(ctx, atrek, userID)
+	session, err := c.SessionService.InitializeSessionFromRetrievalKey(ctx, atrek, userID, instanceID)
 	if err != nil {
-		l.Error("failed to get access token", "error", err)
-		ctx.JSON(http.StatusForbidden, ErrorResponseFromErr("error getting access token", err))
-		return
-	}
-
-	instance, err := c.InstanceRepository.FindExtensionInstanceByID(ctx, instanceID)
-	if err != nil {
-		l.Error("failed to get instance", "error", err)
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Message: "could not retrieve instance"})
-		return
-	}
-
-	authClient, err := mittwaldv2.New(ctx, mittwaldv2.WithAccessToken(token))
-	if err != nil {
-		l.Error("failed to authenticate at API", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error authenticating at API", err))
-		return
-	}
-
-	req := userclientv2.GetUserRequest{UserID: userID}
-	resp, _, err := authClient.User().GetUser(ctx, req)
-	if err != nil {
-		l.Error("failed to get user", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
-		return
-	}
-
-	session, err := model.NewSession()
-	if err != nil {
-		l.Error("failed to initialize session", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
-		return
-	}
-
-	session.Expires = time.Now().Add(c.AuthenticationOptions.CookieTTL)
-	session.Email = strPtrOr(resp.Email, "")
-	session.UserID = resp.UserId
-	session.FirstName = resp.Person.FirstName
-	session.LastName = resp.Person.LastName
-	session.AccessToken = token
-	session.Instance = instance
-
-	if err := c.SessionRepository.CreateSessionWithUnhashedSecret(ctx, session); err != nil {
 		l.Error("failed to create session", "error", err)
-		ctx.JSON(http.StatusInternalServerError, ErrorResponseFromErr("error initializing session", err))
+		ctx.JSON(httperr.StatusForError(err), ErrorResponseFromErr("error initializing session", err))
 		return
 	}
 
 	if c.Development {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", false, false)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 0, "/", "", false, false)
 	} else {
-		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 3600, "/", "", true, true)
+		ctx.SetCookie(c.AuthenticationOptions.CookieName, session.CookieString(), 0, "/", "", true, true)
 	}
 
 	ctx.Redirect(http.StatusSeeOther, "/")
@@ -154,22 +111,6 @@ func (c *UserAuthenticationController) HandleFakeAuthentication(ctx *gin.Context
 	ctx.Redirect(http.StatusSeeOther, "/")
 }
 
-func (c *UserAuthenticationController) getAPITokenFromATREK(ctx context.Context, atrek, userID string) (string, error) {
-	req := userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequest{
-		Body: userclientv2.AuthenticateWithAccessTokenRetrievalKeyRequestBody{
-			AccessTokenRetrievalKey: atrek,
-			UserId:                  userID,
-		},
-	}
-
-	resp, _, err := c.Client.User().AuthenticateWithAccessTokenRetrievalKey(ctx, req)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.Token, nil
-}
-
 func (c *UserAuthenticationController) buildFakeSession() (model.Session, error) {
 	session, err := model.NewSession()
 	if err != nil {
@@ -213,11 +154,4 @@ func extractAuthenticationParamsFromRequest(req *http.Request) (userID, instance
 	}
 
 	return
-}
-
-func strPtrOr(one *string, alt string) string {
-	if one != nil {
-		return *one
-	}
-	return alt
 }

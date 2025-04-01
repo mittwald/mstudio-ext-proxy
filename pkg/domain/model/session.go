@@ -23,6 +23,7 @@ type Session struct {
 	LastName      string
 	Email         string
 	AccessToken   string
+	RefreshToken  string
 	Instance      ExtensionInstance
 }
 
@@ -52,6 +53,10 @@ func (s Session) IssueClaims() *SessionClaims {
 		Session:  s,
 		IssuedAt: time.Now(),
 	}
+}
+
+func (s Session) IsExpired() bool {
+	return s.Expires.Compare(time.Now()) < 0
 }
 
 func SessionIDAndSecretFromCookieString(cookieString string) (string, []byte) {

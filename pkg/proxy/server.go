@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/json"
 	"errors"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 type Handler struct {
 	Configuration             Configuration
 	SessionRepository         repository.SessionRepository
+	SessionService            service.SessionService
 	AuthenticationOptions     authentication.Options
 	Logger                    *slog.Logger
 	HTTPClient                *http.Client
@@ -39,6 +41,17 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.Logger.Warn("invalid session", "err", err)
 		h.respondUnauthorized(writer)
 		return
+	}
+
+	if session.IsExpired() {
+		refreshedSession, err := h.SessionService.RefreshSession(request.Context(), session)
+		if err != nil {
+			h.Logger.Warn("error while refreshing session", "err", err)
+			h.responseError(writer, http.StatusInternalServerError, "internal server error", err)
+			return
+		}
+
+		session = refreshedSession
 	}
 
 	token, err := h.buildUserJWT(session)

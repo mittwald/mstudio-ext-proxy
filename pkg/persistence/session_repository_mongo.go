@@ -74,3 +74,14 @@ func (m *mongoSessionRepository) CreateSession(ctx context.Context, session mode
 	_, err := m.collection.InsertOne(ctx, session)
 	return err
 }
+
+func (m *mongoSessionRepository) RefreshSession(ctx context.Context, session model.Session) error {
+	update := bson.M{
+		"accesstoken":  session.AccessToken,
+		"refreshtoken": session.RefreshToken,
+		"expires":      session.Expires,
+	}
+
+	_, err := m.collection.UpdateOne(ctx, bson.M{"_id": session.ID}, bson.M{"$set": update})
+	return err
+}

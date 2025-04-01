@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/persistence"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/proxy"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/bootstrap"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/controller"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/service"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/persistence"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/proxy"
 )
 
 func main() {
@@ -26,6 +28,8 @@ func main() {
 	instanceRepository := persistence.NewMongoExtensionInstanceRepository(mongoDatabase.Collection("instances"))
 	sessionRepository := persistence.MustNewMongoSessionRepository(mongoDatabase.Collection("sessions"))
 
+	sessionService := service.NewSessionService(mittwaldClient, sessionRepository, instanceRepository)
+
 	webhookCtrl := controller.WebhookController{
 		ExtensionInstanceRepository: instanceRepository,
 		WebhookVerifier:             bootstrap.BuildWebhookVerifier(mittwaldClient),
@@ -34,6 +38,7 @@ func main() {
 	authCtrl := controller.UserAuthenticationController{
 		Client:                mittwaldClient,
 		SessionRepository:     sessionRepository,
+		SessionService:        sessionService,
 		InstanceRepository:    instanceRepository,
 		Development:           config.Context == "dev",
 		AuthenticationOptions: authOptions,
@@ -63,6 +68,7 @@ func main() {
 		proxyHandler := proxy.Handler{
 			HTTPClient:            http.DefaultClient,
 			SessionRepository:     sessionRepository,
+			SessionService:        sessionService,
 			Configuration:         proxyConfig,
 			Logger:                logger,
 			AuthenticationOptions: authOptions,
