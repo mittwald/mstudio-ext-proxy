@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 	"net/http"
 
 	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/userclientv2"
 	"github.com/mittwald/mstudio-ext-proxy/pkg/domain/model"
+	"github.com/mittwald/mstudio-ext-proxy/pkg/httperr"
 )
 
 func (s *sessionService) RefreshSession(ctx context.Context, session *model.Session) (*model.Session, error) {
