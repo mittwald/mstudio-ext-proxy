@@ -16,7 +16,7 @@ func (s *sessionService) RetrieveSession(ctx context.Context, sessionID string, 
 	if session.IsExpired() {
 		refreshedSession, err := s.RefreshSession(ctx, session)
 		if err != nil {
-			return nil, httperr.ErrWithStatus(http.StatusInternalServerError, "internal server error", err)
+			return nil, err
 		}
 
 		return refreshedSession, nil
